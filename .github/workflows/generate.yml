@@ -1,0 +1,29 @@
+name: Generate (Agent)
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: 'Unique job ID for tracking'
+        required: false
+        type: string
+      run_id:
+        description: 'Run ID to process'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: echo "TODO M6 - generate worker"

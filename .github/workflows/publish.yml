@@ -1,0 +1,28 @@
+name: Publish
+
+on:
+  # Every 30 minutes — :00 and :30 IST (= UTC)
+  schedule:
+    - cron: '0,30 * * * *'
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: 'Unique job ID for tracking'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: echo "TODO M3 - publish worker"
