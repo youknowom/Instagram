@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 190" role="img" aria-labelledby="title">
+  <title id="title">An animated Hey message floating in the sky</title>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#4ca9e8" />
+      <stop offset="1" stop-color="#a9dcf5" />
+    </linearGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="3" /></filter>
+  </defs>
+  <style>
+    .cloud { animation: cloud 12s ease-in-out infinite alternate; }
+    .cloud.two { animation-delay: -5s; animation-duration: 15s; }
+    .message { transform-origin: 130px 88px; animation: bob 3.2s ease-in-out infinite; }
+    .green { transform-origin: 72px 88px; animation: sway 2.6s ease-in-out infinite; }
+    .yellow { transform-origin: 188px 87px; animation: sway 3s ease-in-out infinite reverse; }
+    .pink { transform-origin: 126px 111px; animation: sway 2.2s ease-in-out infinite; }
+    .dot { animation: blink 1.4s ease-in-out infinite; }
+    .dot.two { animation-delay: .2s; }
+    .dot.three { animation-delay: .4s; }
+    @keyframes cloud { from { transform: translateX(-8px); } to { transform: translateX(10px); } }
+    @keyframes bob { 0%, 100% { transform: translateY(3px) rotate(-1deg); } 50% { transform: translateY(-7px) rotate(1deg); } }
+    @keyframes sway { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+    @keyframes blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+  </style>
+  <rect x="5" y="5" width="250" height="180" rx="28" fill="url(#sky)" />
+  <g class="cloud" fill="#fff" opacity=".8" filter="url(#soft)">
+    <path d="M-12 44c21-15 39-12 52 0 13-23 47-18 52 7 19-9 37 2 38 19H-12z" />
+  </g>
+  <g class="cloud two" fill="#fff" opacity=".7" filter="url(#soft)">
+    <path d="M150 140c13-19 38-18 48-3 15-24 54-17 58 13H136c0-5 5-8 14-10z" />
+  </g>
+  <g class="message">
+    <ellipse cx="130" cy="91" rx="86" ry="43" fill="#368fd0" opacity=".18" />
+    <g class="green"><ellipse cx="69" cy="87" rx="35" ry="26" fill="#91e08a" /></g>
+    <g class="yellow"><ellipse cx="190" cy="87" rx="34" ry="26" fill="#f5d477" /></g>
+    <g class="pink"><ellipse cx="128" cy="111" rx="43" ry="18" fill="#ee9bd0" /></g>
+    <rect x="57" y="57" width="146" height="61" rx="30" fill="#f4f6fb" stroke="#dfe7f3" stroke-width="2" />
+    <text x="130" y="97" fill="#151b2d" font-family="Arial, sans-serif" font-size="34" font-weight="700" text-anchor="middle">Hey.</text>
+  </g>
+  <g fill="#fff" opacity=".9"><circle class="dot" cx="45" cy="145" r="3" /><circle class="dot two" cx="55" cy="151" r="2" /><circle class="dot three" cx="216" cy="40" r="3" /></g>
+</svg>
