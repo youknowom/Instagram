@@ -4,8 +4,8 @@
 
 | Milestone                    | Status         | Notes                       |
 | ---------------------------- | -------------- | --------------------------- |
-| M0 Scaffold                  | ✅ Done        | Monorepo, CI, docs skeleton |
-| M1 Database & Security       | ⬜ Not started |                             |
+| M0 Scaffold                  | ✅ Done        | Monorepo, CI, docs skeleton, Next.js Web App with Motion & Three.js |
+| M1 Database & Security       | 🟡 In Progress | Schema created, awaiting SQL run in Supabase |
 | M2 Instagram Client & Tokens | ⬜ Not started | HUMAN GATE                  |
 | M3 Publishing Pipeline       | ⬜ Not started |                             |
 | M4 Telegram Path (Path A)    | ⬜ Not started |                             |
