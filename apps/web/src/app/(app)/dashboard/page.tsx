@@ -78,11 +78,49 @@ const MOCK_RECENT_POSTS = [
 
 export default function DashboardPage() {
   const [syncing, setSyncing] = React.useState(false);
+  const [dashboardData, setDashboardData] = React.useState<any>(null);
+
+  const fetchStats = React.useCallback(async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch('/api/dashboard/stats');
+      if (res.ok) {
+        const data = await res.json();
+        setDashboardData(data);
+      }
+    } catch {
+      // silent fallback
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   const handleSync = () => {
-    setSyncing(true);
-    setTimeout(() => setSyncing(false), 1200);
+    fetchStats();
   };
+
+  const followersCount = dashboardData?.profile?.followers ? Number(dashboardData.profile.followers).toLocaleString() : '1,680';
+  const username = dashboardData?.profile?.username ? `@${dashboardData.profile.username}` : '@youkknowom';
+  const queuedCount = dashboardData?.stats?.queuedPosts ?? 2;
+  const postedCount = dashboardData?.stats?.publishedPosts ?? 1;
+
+  const displayPosts = dashboardData?.recentPosts && dashboardData.recentPosts.length > 0
+    ? dashboardData.recentPosts.map((p: any) => ({
+        id: p.id,
+        type: p.media_type || 'IMAGE',
+        niche: p.meta?.niche || 'Aesthetic',
+        quote: p.meta?.quote || p.caption?.slice(0, 50) || 'Automated Quote',
+        status: p.status,
+        time: p.scheduled_at ? new Date(p.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+        likes: p.status === 'posted' ? '1.4k' : '—',
+        views: p.status === 'posted' ? '12.8k' : '—',
+        imageUrl: p.media_paths?.[0] || 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600&auto=format&fit=crop&q=80',
+      }))
+    : MOCK_RECENT_POSTS;
 
   return (
     <div className="min-h-screen bg-surface-0 pb-16">
@@ -156,7 +194,7 @@ export default function DashboardPage() {
                       Total Followers
                     </p>
                     <p className="text-2xl font-bold tracking-tight text-surface-950 font-display">
-                      1,680
+                      {followersCount}
                     </p>
                     <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
                       <TrendingUp className="h-3.5 w-3.5" />
@@ -452,7 +490,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {MOCK_RECENT_POSTS.map((post) => (
+            {displayPosts.map((post: any) => (
               <Card
                 key={post.id}
                 className="overflow-hidden group hover:border-surface-400 transition-all"

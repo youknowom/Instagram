@@ -10,15 +10,13 @@ import {
   AlertCircle,
   Play,
   Trash2,
-  Edit3,
-  Calendar,
   Sparkles,
   RefreshCw,
   ExternalLink,
 } from 'lucide-react';
 import { InstagramIcon } from '@/components/ui/icons';
 import { Header } from '@/components/layout/header';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { fadeUp, springGentle } from '@/lib/motion';
@@ -35,24 +33,12 @@ interface PostItem {
   imageUrl: string;
   likes?: string;
   views?: string;
+  igPermalink?: string;
 }
 
 const INITIAL_QUEUE: PostItem[] = [
   {
     id: 'q1',
-    source: 'agent',
-    mediaType: 'REELS',
-    niche: 'Dark Poetry',
-    quote: 'Silence is not empty. It is full of answers.',
-    caption:
-      'Late night ruminations. Sometimes the loudest conversations happen in complete stillness. #darkpoetry #cinematic',
-    scheduledAt: 'Today, 2:30 PM IST',
-    status: 'approved',
-    imageUrl:
-      'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'q2',
     source: 'agent',
     mediaType: 'IMAGE',
     niche: 'Couple & Romance',
@@ -65,7 +51,7 @@ const INITIAL_QUEUE: PostItem[] = [
       'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600&auto=format&fit=crop&q=80',
   },
   {
-    id: 'q3',
+    id: 'q2',
     source: 'agent',
     mediaType: 'IMAGE',
     niche: 'Stoic Wisdom',
@@ -76,44 +62,115 @@ const INITIAL_QUEUE: PostItem[] = [
     imageUrl:
       'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80',
   },
-  {
-    id: 'q4',
-    source: 'manual',
-    mediaType: 'REELS',
-    niche: 'Telegram Ingest',
-    quote: 'Hybrid Reel Upload',
-    caption: 'Weekend aesthetic compilation dropped via Telegram bot.',
-    scheduledAt: 'Yesterday, 8:00 PM IST',
-    status: 'posted',
-    likes: '1.2k',
-    views: '14.5k',
-    imageUrl:
-      'https://images.unsplash.com/photo-1522673607200-164d1b6ce486?w=600&auto=format&fit=crop&q=80',
-  },
 ];
 
 export default function QueuePage() {
   const [filter, setFilter] = React.useState<string>('all');
   const [posts, setPosts] = React.useState<PostItem[]>(INITIAL_QUEUE);
+  const [loading, setLoading] = React.useState(true);
+  const [publishingId, setPublishingId] = React.useState<string | null>(null);
+
+  const fetchPosts = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/posts');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.posts && data.posts.length > 0) {
+          const mapped: PostItem[] = data.posts.map((p: any) => ({
+            id: p.id,
+            source: p.source || 'agent',
+            mediaType: p.media_type || 'IMAGE',
+            niche: p.meta?.niche || 'Automated',
+            quote: p.meta?.quote || p.caption?.slice(0, 60) || 'Post Item',
+            caption: p.caption || '',
+            scheduledAt: p.scheduled_at
+              ? new Date(p.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : 'Scheduled',
+            status: p.status,
+            imageUrl: p.media_paths?.[0] || 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600&auto=format&fit=crop&q=80',
+            igPermalink: p.ig_permalink,
+          }));
+          setPosts(mapped);
+        }
+      }
+    } catch {
+      // Keep initial queue
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
 
   const filteredPosts = posts.filter((p) => {
     if (filter === 'all') return true;
     return p.status === filter;
   });
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
     setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'approved' } : p)));
+    try {
+      await fetch(`/api/posts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      });
+    } catch {
+      // silent
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handlePublishNow = async (id: string) => {
+    setPublishingId(id);
+    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'publishing' } : p)));
+
+    try {
+      const res = await fetch(`/api/posts/${id}/publish`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === id
+              ? {
+                  ...p,
+                  status: 'posted',
+                  likes: '0',
+                  views: '0',
+                }
+              : p
+          )
+        );
+      } else {
+        alert(data.error || 'Publishing failed. Check Instagram connection.');
+        setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'approved' } : p)));
+      }
+    } catch (err) {
+      alert('Network error while publishing');
+      setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'approved' } : p)));
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
     setPosts((prev) => prev.filter((p) => p.id !== id));
+    try {
+      await fetch(`/api/posts/${id}`, { method: 'DELETE' });
+    } catch {
+      // silent
+    }
   };
 
   return (
     <div className="min-h-screen bg-surface-0 pb-20">
       <Header
         title="Publishing Queue"
-        description="Monitor, approve, reschedule and publish posts on schedule"
+        description="Monitor, approve, reschedule and publish posts live to Instagram"
       />
 
       <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
@@ -136,6 +193,10 @@ export default function QueuePage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={fetchPosts} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             <Link href="/workspace">
               <Button variant="accent" size="sm">
                 <Sparkles className="h-3.5 w-3.5 mr-1.5" />
@@ -217,16 +278,31 @@ export default function QueuePage() {
                         </Button>
                       )}
                       {post.status === 'approved' && (
-                        <Button variant="outline" size="sm" className="text-xs text-surface-900">
-                          <Play className="h-3 w-3 mr-1" />
-                          Publish Now (Live)
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={publishingId === post.id}
+                          onClick={() => handlePublishNow(post.id)}
+                          className="text-xs text-surface-900 border-accent-500/40 hover:bg-accent-500/10"
+                        >
+                          {publishingId === post.id ? (
+                            <>
+                              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                              Publishing...
+                            </>
+                          ) : (
+                            <>
+                              <InstagramIcon className="h-3 w-3 mr-1 text-accent-500" />
+                              Publish Now (Live)
+                            </>
+                          )}
                         </Button>
                       )}
                       {post.status === 'posted' && (
-                        <div className="flex items-center gap-3 text-xs text-surface-600">
-                          <span>{post.likes} likes</span>
-                          <span>{post.views} views</span>
-                        </div>
+                        <Badge variant="success" className="text-xs flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Published to Instagram
+                        </Badge>
                       )}
                       <Button
                         variant="ghost"

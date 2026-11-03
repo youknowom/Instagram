@@ -172,6 +172,9 @@ const QUOTE_PRESETS: Record<string, { quote: string; caption: string; hashtags: 
 export default function WorkspacePage() {
   const [mode, setMode] = React.useState<'auto' | 'hybrid'>('auto');
   const [selectedNiche, setSelectedNiche] = React.useState('couple');
+  const [images, setImages] = React.useState<Array<{ id: string; url: string; title: string; resolution: string }>>(
+    MOCK_PINTEREST_RESULTS.couple
+  );
   const [selectedImage, setSelectedImage] = React.useState(MOCK_PINTEREST_RESULTS.couple[0].url);
   const [quoteText, setQuoteText] = React.useState(QUOTE_PRESETS.couple.quote);
   const [captionText, setCaptionText] = React.useState(QUOTE_PRESETS.couple.caption);
@@ -188,43 +191,94 @@ export default function WorkspacePage() {
   const [isQueuing, setIsQueuing] = React.useState(false);
   const [queueSuccess, setQueueSuccess] = React.useState(false);
 
-  // Sync niche preset
-  const handleNicheChange = (nicheId: string) => {
+  // Sync niche preset & live visual backgrounds
+  const handleNicheChange = async (nicheId: string) => {
     setSelectedNiche(nicheId);
-    const results = MOCK_PINTEREST_RESULTS[nicheId] || MOCK_PINTEREST_RESULTS.couple;
-    setSelectedImage(results[0].url);
+    try {
+      const res = await fetch(`/api/pinterest?niche=${nicheId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+          setImages(data.results);
+          setSelectedImage(data.results[0].url);
+        }
+      }
+    } catch {
+      const fallback = MOCK_PINTEREST_RESULTS[nicheId] || MOCK_PINTEREST_RESULTS.couple;
+      setImages(fallback);
+      setSelectedImage(fallback[0].url);
+    }
+
     const preset = QUOTE_PRESETS[nicheId] || QUOTE_PRESETS.couple;
     setQuoteText(preset.quote);
     setCaptionText(preset.caption);
     setHashtags(preset.hashtags);
   };
 
-  const handleRegenerateQuote = () => {
+  const handleRegenerateQuote = async () => {
     setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ niche: selectedNiche }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.quote) setQuoteText(data.quote);
+        if (data.caption) setCaptionText(data.caption);
+        if (data.hashtags && data.hashtags.length > 0) setHashtags(data.hashtags);
+      }
+    } catch {
       const quotes = [
         'We loved with a love that was more than love.',
         'You are my favorite notification in a noisy world.',
         'Home is not a place, it is a person with your eyes.',
       ];
       setQuoteText(quotes[Math.floor(Math.random() * quotes.length)]);
-    }, 800);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const handleSchedulePost = () => {
+  const handleSchedulePost = async () => {
     setIsQueuing(true);
-    setTimeout(() => {
-      setIsQueuing(false);
-      setQueueSuccess(true);
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.65 },
-        colors: ['#ec4899', '#8b5cf6', '#22c55e'],
+    try {
+      const fullCaption = `${quoteText}\n\n${captionText}\n\n${hashtags.join(' ')}`;
+      const res = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: mode === 'auto' ? 'agent' : 'manual',
+          media_type: aspectRatio === '9/16' ? 'REELS' : 'IMAGE',
+          status: 'pending_approval',
+          caption: fullCaption,
+          media_paths: [selectedImage],
+          meta: {
+            niche: selectedNiche,
+            quote: quoteText,
+            font: fontFamily,
+            scrim: scrimOpacity,
+            scheduledTime,
+          },
+        }),
       });
-      setTimeout(() => setQueueSuccess(false), 4000);
-    }, 1000);
+
+      if (res.ok) {
+        setQueueSuccess(true);
+        confetti({
+          particleCount: 80,
+          spread: 60,
+          origin: { y: 0.65 },
+          colors: ['#ec4899', '#8b5cf6', '#22c55e'],
+        });
+        setTimeout(() => setQueueSuccess(false), 4000);
+      }
+    } catch (err) {
+      console.error('Failed to queue post:', err);
+    } finally {
+      setIsQueuing(false);
+    }
   };
 
   return (
@@ -330,9 +384,8 @@ export default function WorkspacePage() {
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {(MOCK_PINTEREST_RESULTS[selectedNiche] || MOCK_PINTEREST_RESULTS.couple).map(
-                    (img) => {
-                      const isPicked = selectedImage === img.url;
+                  {images.map((img) => {
+                    const isPicked = selectedImage === img.url;
                       return (
                         <div
                           key={img.id}
