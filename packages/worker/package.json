@@ -14,6 +14,14 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ig-auto/core": "workspace:*"
+    "@google/genai": "^2.32.0",
+    "@ig-auto/core": "workspace:*",
+    "@supabase/supabase-js": "^2",
+    "cheerio": "^1.2.0",
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/sharp": "^0.32.0"
   }
 }
