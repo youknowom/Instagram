@@ -1,20 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
-interface InstagramAccount {
-  id: string;
-  username: string;
-  name?: string;
-  profile_picture_url?: string;
-}
-
-interface PageAccount {
-  id: string;
-  name: string;
-  access_token: string;
-  instagram_business_account?: InstagramAccount;
-}
-
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
   const searchParams = request.nextUrl.searchParams;
@@ -24,7 +10,7 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
-  // Handle user declining or Meta errors
+  // Handle user declining or Instagram errors
   if (error) {
     const message = errorDescription || error || 'Authorization was cancelled';
     return NextResponse.redirect(`${origin}/settings?error=${encodeURIComponent(message)}`);
@@ -53,97 +39,88 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // 1. Exchange authorization code for short-lived user access token
-    const tokenUrl = new URL('https://graph.facebook.com/v26.0/oauth/access_token');
-    tokenUrl.searchParams.set('client_id', appId);
-    tokenUrl.searchParams.set('client_secret', appSecret);
-    tokenUrl.searchParams.set('redirect_uri', redirectUri);
-    tokenUrl.searchParams.set('code', code);
+    // ──────────────────────────────────────────────
+    // Step 1: Exchange code for short-lived token
+    // Instagram Login uses api.instagram.com (NOT graph.facebook.com)
+    // ──────────────────────────────────────────────
+    const tokenRes = await fetch('https://api.instagram.com/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: appId,
+        client_secret: appSecret,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri,
+        code,
+      }),
+    });
 
-    const tokenRes = await fetch(tokenUrl.toString(), { method: 'GET' });
     const tokenData = await tokenRes.json();
 
     if (!tokenRes.ok || !tokenData.access_token) {
-      const err = tokenData?.error?.message || 'Failed to exchange authorization code';
+      const err = tokenData?.error_message || tokenData?.error?.message || 'Failed to exchange authorization code';
       return NextResponse.redirect(`${origin}/settings?error=${encodeURIComponent(err)}`);
     }
 
-    const shortLivedToken = tokenData.access_token;
+    const shortLivedToken: string = tokenData.access_token;
+    const igUserId: string = String(tokenData.user_id);
 
-    // 2. Exchange short-lived token for long-lived user token (60-day expiry)
-    const longLivedUrl = new URL('https://graph.facebook.com/v26.0/oauth/access_token');
-    longLivedUrl.searchParams.set('grant_type', 'fb_exchange_token');
-    longLivedUrl.searchParams.set('client_id', appId);
+    // ──────────────────────────────────────────────
+    // Step 2: Exchange for long-lived token (60 days)
+    // Uses graph.instagram.com
+    // ──────────────────────────────────────────────
+    const longLivedUrl = new URL('https://graph.instagram.com/access_token');
+    longLivedUrl.searchParams.set('grant_type', 'ig_exchange_token');
     longLivedUrl.searchParams.set('client_secret', appSecret);
-    longLivedUrl.searchParams.set('fb_exchange_token', shortLivedToken);
+    longLivedUrl.searchParams.set('access_token', shortLivedToken);
 
     const longLivedRes = await fetch(longLivedUrl.toString(), { method: 'GET' });
     const longLivedData = await longLivedRes.json();
 
-    const activeUserToken = longLivedData.access_token || shortLivedToken;
-    const expiresInSeconds = longLivedData.expires_in || 60 * 24 * 60 * 60; // 60 days default
+    const activeToken: string = longLivedData.access_token || shortLivedToken;
+    const expiresInSeconds: number = longLivedData.expires_in || 60 * 24 * 60 * 60;
     const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
 
-    // 3. Find connected Instagram Professional / Business account
-    const accountsUrl = new URL('https://graph.facebook.com/v26.0/me/accounts');
-    accountsUrl.searchParams.set(
-      'fields',
-      'id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}'
-    );
-    accountsUrl.searchParams.set('access_token', activeUserToken);
+    // ──────────────────────────────────────────────
+    // Step 3: Fetch Instagram profile info
+    // ──────────────────────────────────────────────
+    const profileUrl = new URL(`https://graph.instagram.com/v26.0/me`);
+    profileUrl.searchParams.set('fields', 'user_id,username,name,profile_picture_url,account_type');
+    profileUrl.searchParams.set('access_token', activeToken);
 
-    const accountsRes = await fetch(accountsUrl.toString(), { method: 'GET' });
-    const accountsData = await accountsRes.json();
+    const profileRes = await fetch(profileUrl.toString(), { method: 'GET' });
+    const profileData = await profileRes.json();
 
-    let igAccountId = '';
-    let igUsername = '';
-    let pageAccessToken = activeUserToken;
+    const igUsername: string = profileData.username || '';
+    const igName: string = profileData.name || '';
+    const accountType: string = profileData.account_type || '';
 
-    if (accountsData.data && Array.isArray(accountsData.data)) {
-      for (const page of accountsData.data as PageAccount[]) {
-        if (page.instagram_business_account) {
-          igAccountId = page.instagram_business_account.id;
-          igUsername = page.instagram_business_account.username;
-          // A page access token derived from a 60-day user token never expires
-          pageAccessToken = page.access_token || activeUserToken;
-          break;
-        }
-      }
-    }
-
-    // Fallback: If not linked through a page directly, check /me
-    if (!igAccountId) {
-      const meUrl = `https://graph.facebook.com/v26.0/me?fields=id,name&access_token=${activeUserToken}`;
-      const meRes = await fetch(meUrl);
-      const meData = await meRes.json();
-      igAccountId = meData.id || '';
-      igUsername = meData.name || 'connected_creator';
-    }
-
-    // 4. Save credentials to Supabase
+    // ──────────────────────────────────────────────
+    // Step 4: Store credentials in Supabase
+    // ──────────────────────────────────────────────
     const supabase = getSupabaseAdmin();
 
     try {
-      // Store in settings table
       await supabase
         .from('settings')
         .upsert(
           {
             id: 1,
-            ig_user_id: igAccountId,
+            ig_user_id: igUserId,
             updated_at: new Date().toISOString(),
           },
           { onConflict: 'id' }
         );
 
-      // Store tokens in kv key-value table
       await supabase.from('kv').upsert([
         {
           key: 'ig_access_token',
           value: {
-            token: pageAccessToken,
-            user_id: igAccountId,
+            token: activeToken,
+            user_id: igUserId,
             username: igUsername,
+            name: igName,
+            account_type: accountType,
             expires_at: expiresAt,
             updated_at: new Date().toISOString(),
           },
@@ -153,7 +130,9 @@ export async function GET(request: NextRequest) {
       console.warn('Could not persist to Supabase immediately:', dbErr);
     }
 
-    // Redirect to settings with success
+    // ──────────────────────────────────────────────
+    // Step 5: Redirect back to settings with success
+    // ──────────────────────────────────────────────
     const successUrl = new URL(`${origin}/settings`);
     successUrl.searchParams.set('status', 'connected');
     if (igUsername) {
@@ -161,8 +140,6 @@ export async function GET(request: NextRequest) {
     }
 
     const response = NextResponse.redirect(successUrl.toString());
-
-    // Clear state cookie
     response.cookies.delete('ig_oauth_state');
 
     return response;

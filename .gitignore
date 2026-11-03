@@ -11,3 +11,5 @@ coverage/
 .vite/
 supabase/.temp/
 assets/
+ 
+assets/

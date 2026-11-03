@@ -17,21 +17,16 @@ export async function GET(request: NextRequest) {
   // CSRF state token
   const state = crypto.randomBytes(24).toString('hex');
 
-  // Permissions required for PostPilot:
-  // - instagram_basic: read account info & media
-  // - instagram_content_publish: auto-publish posts/reels
-  // - pages_read_engagement: read page engagement
-  // - pages_show_list: locate linked Facebook pages
-  // - business_management: access business assets
+  // Instagram Login scopes (direct Instagram auth, no Facebook needed)
   const scopes = [
-    'instagram_basic',
-    'instagram_content_publish',
-    'pages_read_engagement',
-    'pages_show_list',
-    'business_management',
+    'instagram_business_basic',
+    'instagram_business_content_publish',
+    'instagram_business_manage_comments',
+    'instagram_business_manage_messages',
   ].join(',');
 
-  const authUrl = new URL('https://www.facebook.com/v26.0/dialog/oauth');
+  // Use Instagram's native OAuth dialog — NOT Facebook's
+  const authUrl = new URL('https://www.instagram.com/oauth/authorize');
   authUrl.searchParams.set('client_id', appId);
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('scope', scopes);
