@@ -126,3 +126,4 @@ Respond in strict JSON with keys:
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+

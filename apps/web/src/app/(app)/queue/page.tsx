@@ -111,20 +111,33 @@ export default function QueuePage() {
 
   const handleApprove = async (id: string) => {
     setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'approved' } : p)));
-    try {
-      await fetch(`/api/posts/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'approved' }),
-      });
-    } catch {
-      // silent
+    if (!id.startsWith('q')) {
+      try {
+        await fetch(`/api/posts/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'approved' }),
+        });
+      } catch {
+        // silent
+      }
     }
   };
 
   const handlePublishNow = async (id: string) => {
     setPublishingId(id);
     setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'publishing' } : p)));
+
+    if (id.startsWith('q')) {
+      // Mock post preview
+      setTimeout(() => {
+        setPosts((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: 'posted', likes: '1.2k', views: '14.5k' } : p))
+        );
+        setPublishingId(null);
+      }, 1000);
+      return;
+    }
 
     try {
       const res = await fetch(`/api/posts/${id}/publish`, {
@@ -159,10 +172,12 @@ export default function QueuePage() {
 
   const handleDelete = async (id: string) => {
     setPosts((prev) => prev.filter((p) => p.id !== id));
-    try {
-      await fetch(`/api/posts/${id}`, { method: 'DELETE' });
-    } catch {
-      // silent
+    if (!id.startsWith('q')) {
+      try {
+        await fetch(`/api/posts/${id}`, { method: 'DELETE' });
+      } catch {
+        // silent
+      }
     }
   };
 
