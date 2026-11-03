@@ -248,3 +248,4 @@ export class PinterestSearchProvider {
     return (CURATED_AESTHETICS.dark || []).slice(0, limit);
   }
 }
+

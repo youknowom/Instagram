@@ -22,3 +22,4 @@ describe('QuoteAgent', () => {
     expect(result.hashtags.some((t) => t.includes('stoic'))).toBe(true);
   });
 });
+

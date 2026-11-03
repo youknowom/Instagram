@@ -32,3 +32,4 @@ describe('PinterestSearchProvider', () => {
     expect(results[0].title.toLowerCase()).toContain('marcus');
   });
 });
+

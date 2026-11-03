@@ -12,3 +12,4 @@ describe('InstagramClient', () => {
     expect(result.mediaId).toBeUndefined();
   });
 });
+

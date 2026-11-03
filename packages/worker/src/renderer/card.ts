@@ -149,3 +149,4 @@ export class CardRenderer {
       .replace(/'/g, '&apos;');
   }
 }
+
