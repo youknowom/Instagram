@@ -46,6 +46,7 @@ async function getMetaGrantDiagnostics(token: string, appId: string, appSecret: 
   const appAccessToken = `${appId}|${appSecret}`;
   const debugUrl = new URL(`https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}/debug_token`);
   debugUrl.searchParams.set('input_token', token);
+  debugUrl.searchParams.set('access_token', appAccessToken);
 
   const [identityResult, permissionsResult, debugResult] = await Promise.allSettled([
     fetch(
@@ -56,10 +57,7 @@ async function getMetaGrantDiagnostics(token: string, appId: string, appSecret: 
       `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}/me/permissions?access_token=${encodeURIComponent(token)}`,
       { cache: 'no-store' },
     ),
-    fetch(debugUrl, {
-      headers: { Authorization: `Bearer ${appAccessToken}` },
-      cache: 'no-store',
-    }),
+    fetch(debugUrl, { cache: 'no-store' }),
   ]);
 
   let hasBusinessPortfolio = false;
@@ -202,7 +200,9 @@ async function getFacebookLoginAccount(
   appSecret: string,
 ) {
   const redirectUri = `${origin}/api/auth/instagram/callback`;
-  const tokenUrl = new URL('https://graph.facebook.com/oauth/access_token');
+  const tokenUrl = new URL(
+    `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}/oauth/access_token`,
+  );
   tokenUrl.searchParams.set('client_id', appId);
   tokenUrl.searchParams.set('client_secret', appSecret);
   tokenUrl.searchParams.set('redirect_uri', redirectUri);
@@ -219,10 +219,9 @@ async function getFacebookLoginAccount(
   const accountsUrl = new URL(
     `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}/me/assigned_instagram_accounts`,
   );
-  accountsUrl.searchParams.set(
-    'fields',
-    'id,username,name,profile_picture_url,account_type,followers_count,follows_count,media_count',
-  );
+  // Keep discovery to the fields needed from the edge. Request profile metrics
+  // separately by ID, so optional field availability cannot hide the account.
+  accountsUrl.searchParams.set('fields', 'id,username');
   accountsUrl.searchParams.set('access_token', token);
   const accountsResponse = await fetch(accountsUrl, { cache: 'no-store' });
   const accountsData = await accountsResponse.json();
@@ -236,6 +235,10 @@ async function getFacebookLoginAccount(
   }
 
   let profile = (accountsData.data as InstagramProfile[] | undefined)?.[0];
+  if (profile?.id) {
+    const fullProfile = await getInstagramProfileById(profile.id, token);
+    if (fullProfile) profile = { ...profile, ...fullProfile };
+  }
   if (!profile?.id) {
     const diagnostics = await getMetaGrantDiagnostics(token, appId, appSecret);
     for (const targetId of diagnostics.instagramTargetIds) {
@@ -261,8 +264,16 @@ async function getFacebookLoginAccount(
         instagramTargetCount: diagnostics.instagramTargetIds.length,
       });
 
+      const diagnosticSummary = [
+        `token valid: ${diagnostics.isTokenValid === null ? 'unknown' : diagnostics.isTokenValid}`,
+        `token type: ${diagnostics.tokenType}`,
+        `Instagram basic: ${diagnostics.instagramBasic}`,
+        `business portfolio: ${diagnostics.hasBusinessPortfolio ? 'present' : 'not detected'}`,
+        `Instagram scope targets: ${diagnostics.instagramTargetIds.length}`,
+      ].join('; ');
+
       throw new Error(
-        `Meta accepted the login, but its API returned no Instagram account for the granted token${accountsResponse.headers.get('x-fb-request-id') ? ` (Meta request ${accountsResponse.headers.get('x-fb-request-id')})` : ''}. The connection was not saved. If you selected a professional Instagram account, contact Meta support with this request ID.`,
+        `Meta accepted the login, but its API returned no Instagram account for the granted token${accountsResponse.headers.get('x-fb-request-id') ? ` (Meta request ${accountsResponse.headers.get('x-fb-request-id')})` : ''}. ${diagnosticSummary}. The connection was not saved.`,
       );
     }
   }
