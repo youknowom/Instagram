@@ -262,7 +262,7 @@ async function getFacebookLoginAccount(
       });
 
       throw new Error(
-        `Meta login completed, but the API returned no Instagram account for the granted token${accountsResponse.headers.get('x-fb-request-id') ? ` (Meta request ${accountsResponse.headers.get('x-fb-request-id')})` : ''}. The connection was not saved. Confirm the account is Business or Creator and belongs to the selected business portfolio.`,
+        `Meta accepted the login, but its API returned no Instagram account for the granted token${accountsResponse.headers.get('x-fb-request-id') ? ` (Meta request ${accountsResponse.headers.get('x-fb-request-id')})` : ''}. The connection was not saved. If you selected a professional Instagram account, contact Meta support with this request ID.`,
       );
     }
   }
