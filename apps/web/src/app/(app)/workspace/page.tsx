@@ -9,18 +9,8 @@ import {
   Wand2,
   Image as ImageIcon,
   Check,
-  ChevronRight,
-  Music,
-  Calendar,
   Clock,
-  Sliders,
-  Type,
-  Layers,
-  Share2,
   RefreshCw,
-  Copy,
-  Info,
-  ArrowRight,
   Zap,
 } from 'lucide-react';
 import { Header } from '@/components/layout/header';
@@ -29,220 +19,107 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Card3DPreview } from '@/components/studio/Card3DPreview';
-import { fadeUp, springGentle, springBounce } from '@/lib/motion';
-
-const NICHES = [
-  { id: 'couple', name: 'Couple & Romance', icon: '❤️', hint: 'Moody vintage 90s film aesthetic' },
-  {
-    id: 'stoic',
-    name: 'Stoic Wisdom',
-    icon: '🏛️',
-    hint: 'Sculptures, ancient architecture, philosophy',
-  },
-  {
-    id: 'dark-poetry',
-    name: 'Dark Poetry & Cinema',
-    icon: '🌙',
-    hint: 'Grainy film stills, rain, melancholic night',
-  },
-  {
-    id: 'anime',
-    name: 'Anime Aesthetics',
-    icon: '⚡',
-    hint: 'Lo-fi anime skies, neon streets, warm dusk',
-  },
-  {
-    id: 'luxury',
-    name: 'Quiet Luxury',
-    icon: '🍸',
-    hint: 'Minimalist architecture, old money vintage',
-  },
-];
-
-const MOCK_PINTEREST_RESULTS: Record<
-  string,
-  Array<{ id: string; url: string; title: string; resolution: string }>
-> = {
-  couple: [
-    {
-      id: 'c1',
-      url: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800&auto=format&fit=crop&q=85',
-      title: 'Warm sunset embrace 35mm film',
-      resolution: '1080x1350',
-    },
-    {
-      id: 'c2',
-      url: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=800&auto=format&fit=crop&q=85',
-      title: 'Holding hands rainy car window reflection',
-      resolution: '1080x1920',
-    },
-    {
-      id: 'c3',
-      url: 'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=800&auto=format&fit=crop&q=85',
-      title: 'Golden hour silhouette at beach',
-      resolution: '1080x1350',
-    },
-    {
-      id: 'c4',
-      url: 'https://images.unsplash.com/photo-1522673607200-164d1b6ce486?w=800&auto=format&fit=crop&q=85',
-      title: 'Vintage coffee shop conversation',
-      resolution: '1080x1350',
-    },
-  ],
-  stoic: [
-    {
-      id: 's1',
-      url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=85',
-      title: 'Marcus Aurelius marble bust warm chiaroscuro',
-      resolution: '1080x1350',
-    },
-    {
-      id: 's2',
-      url: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&auto=format&fit=crop&q=85',
-      title: 'Dramatic foggy mountain ridge path',
-      resolution: '1080x1920',
-    },
-  ],
-  'dark-poetry': [
-    {
-      id: 'p1',
-      url: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=800&auto=format&fit=crop&q=85',
-      title: 'Rain drops on dark neon window at night',
-      resolution: '1080x1350',
-    },
-    {
-      id: 'p2',
-      url: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=800&auto=format&fit=crop&q=85',
-      title: 'Moody cinematic city street empty fog',
-      resolution: '1080x1920',
-    },
-  ],
-  anime: [
-    {
-      id: 'a1',
-      url: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&auto=format&fit=crop&q=85',
-      title: 'Pastel purple twilight cloudscape',
-      resolution: '1080x1350',
-    },
-  ],
-  luxury: [
-    {
-      id: 'l1',
-      url: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&auto=format&fit=crop&q=85',
-      title: 'Modern architectural villa overlooking water',
-      resolution: '1080x1350',
-    },
-  ],
-};
-
-const QUOTE_PRESETS: Record<string, { quote: string; caption: string; hashtags: string[] }> = {
-  couple: {
-    quote: 'In a room full of art, I would still stare at you.',
-    caption:
-      'Some connections don’t need words — they just exist in quiet glances and comfortable silences. Tag the one person who feels like home. ✨',
-    hashtags: ['#couplelove', '#romancequotes', '#aestheticvibes', '#lovequotes', '#heartfelt'],
-  },
-  stoic: {
-    quote:
-      'You have power over your mind, not outside events. Realize this, and you will find strength.',
-    caption:
-      'Mastering the art of indifference toward what you cannot control. Peace begins where expectation ends.',
-    hashtags: ['#stoicism', '#marcusaurelius', '#innerstrength', '#mindsetshift', '#stoicwisdom'],
-  },
-  'dark-poetry': {
-    quote: 'Silence is not empty. It is full of answers you are not ready to hear.',
-    caption:
-      'Late night ruminations. Sometimes the loudest conversations happen in complete stillness.',
-    hashtags: ['#darkpoetry', '#melancholy', '#cinematicvibes', '#midnightthoughts', '#poetryporn'],
-  },
-  anime: {
-    quote: 'Even if the skies turn dark, memories keep their neon glow.',
-    caption:
-      'Nostalgic dusk in Tokyo. Remember where you started before you stress about where you are going.',
-    hashtags: ['#animeaesthetic', '#lofihiphop', '#citypop', '#neonaesthetic', '#dusk'],
-  },
-  luxury: {
-    quote: 'Silence is the ultimate luxury. Let your results speak.',
-    caption:
-      'Curate your energy, your circle, and your time. Quality over noise every single time.',
-    hashtags: ['#quietluxury', '#oldmoney', '#minimalism', '#highstandards', '#discipline'],
-  },
-};
+import { fadeUp } from '@/lib/motion';
 
 export default function WorkspacePage() {
   const [mode, setMode] = React.useState<'auto' | 'hybrid'>('auto');
-  const [selectedNiche, setSelectedNiche] = React.useState('couple');
-  const [images, setImages] = React.useState<Array<{ id: string; url: string; title: string; resolution: string }>>(
-    MOCK_PINTEREST_RESULTS.couple
-  );
-  const [selectedImage, setSelectedImage] = React.useState(MOCK_PINTEREST_RESULTS.couple[0].url);
-  const [quoteText, setQuoteText] = React.useState(QUOTE_PRESETS.couple.quote);
-  const [captionText, setCaptionText] = React.useState(QUOTE_PRESETS.couple.caption);
-  const [hashtags, setHashtags] = React.useState<string[]>(QUOTE_PRESETS.couple.hashtags);
+  const [selectedNiche, setSelectedNiche] = React.useState('');
+  const [images, setImages] = React.useState<
+    Array<{ id: string; url: string; title: string; resolution: string }>
+  >([]);
+  const [selectedImage, setSelectedImage] = React.useState('');
+  const [quoteText, setQuoteText] = React.useState('');
+  const [captionText, setCaptionText] = React.useState('');
+  const [hashtags, setHashtags] = React.useState<string[]>([]);
   const [scrimOpacity, setScrimOpacity] = React.useState(0.5);
   const [fontFamily, setFontFamily] = React.useState('Playfair Display');
-  const [aspectRatio, setAspectRatio] = React.useState<'4/5' | '9/16'>('4/5');
-  const [isAiDisclosed, setIsAiDisclosed] = React.useState(false);
-  const [audioOption, setAudioOption] = React.useState<'trending_ig' | 'baked_lofi' | 'none'>(
-    'trending_ig',
-  );
-  const [scheduledTime, setScheduledTime] = React.useState('19:30');
+  const aspectRatio = '4/5';
+  const [scheduledTime, setScheduledTime] = React.useState('');
+  const [scheduledDate, setScheduledDate] = React.useState('');
+  const [localTimeZone, setLocalTimeZone] = React.useState('');
   const [isGenerating, setIsGenerating] = React.useState(false);
+  const [isSearchingImages, setIsSearchingImages] = React.useState(false);
   const [isQueuing, setIsQueuing] = React.useState(false);
   const [queueSuccess, setQueueSuccess] = React.useState(false);
+  const [workspaceError, setWorkspaceError] = React.useState<string | null>(null);
+  const [uploadFile, setUploadFile] = React.useState<File | null>(null);
+  const [hybridTheme, setHybridTheme] = React.useState('');
+  const [hybridCaption, setHybridCaption] = React.useState('');
+  const [isUploading, setIsUploading] = React.useState(false);
 
-  // Sync niche preset & live visual backgrounds
-  const handleNicheChange = async (nicheId: string) => {
-    setSelectedNiche(nicheId);
-    try {
-      const res = await fetch(`/api/pinterest?niche=${nicheId}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.results && data.results.length > 0) {
-          setImages(data.results);
-          setSelectedImage(data.results[0].url);
-        }
-      }
-    } catch {
-      const fallback = MOCK_PINTEREST_RESULTS[nicheId] || MOCK_PINTEREST_RESULTS.couple;
-      setImages(fallback);
-      setSelectedImage(fallback[0].url);
+  React.useEffect(() => {
+    const localToday = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000)
+      .toISOString()
+      .slice(0, 10);
+    const nextSlot = new Date();
+    nextSlot.setHours(nextSlot.getHours() + 1, 0, 0, 0);
+    const localNextSlot = new Date(nextSlot.getTime() - nextSlot.getTimezoneOffset() * 60_000)
+      .toISOString()
+      .slice(11, 16);
+    setScheduledDate(localToday);
+    setScheduledTime(localNextSlot);
+    setLocalTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  }, []);
+
+  const handleSearchVisuals = async (query = selectedNiche) => {
+    if (!query.trim()) {
+      setWorkspaceError('Describe the content niche or visual style to search for.');
+      return;
     }
-
-    const preset = QUOTE_PRESETS[nicheId] || QUOTE_PRESETS.couple;
-    setQuoteText(preset.quote);
-    setCaptionText(preset.caption);
-    setHashtags(preset.hashtags);
+    setIsSearchingImages(true);
+    setWorkspaceError(null);
+    try {
+      const res = await fetch(`/api/pinterest?query=${encodeURIComponent(query)}`, {
+        cache: 'no-store',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Visual search failed');
+      setImages(data.results || []);
+      setSelectedImage(data.results?.[0]?.url || '');
+      if (!data.results?.length)
+        setWorkspaceError('No matching visuals were returned. Try a broader phrase.');
+    } catch (error) {
+      setImages([]);
+      setSelectedImage('');
+      setWorkspaceError(error instanceof Error ? error.message : 'Visual search failed');
+    } finally {
+      setIsSearchingImages(false);
+    }
   };
 
   const handleRegenerateQuote = async () => {
+    if (!selectedNiche.trim()) {
+      setWorkspaceError('Enter a content niche before generating a post.');
+      return;
+    }
     setIsGenerating(true);
+    setWorkspaceError(null);
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ niche: selectedNiche }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.quote) setQuoteText(data.quote);
-        if (data.caption) setCaptionText(data.caption);
-        if (data.hashtags && data.hashtags.length > 0) setHashtags(data.hashtags);
-      }
-    } catch {
-      const quotes = [
-        'We loved with a love that was more than love.',
-        'You are my favorite notification in a noisy world.',
-        'Home is not a place, it is a person with your eyes.',
-      ];
-      setQuoteText(quotes[Math.floor(Math.random() * quotes.length)]);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'AI generation failed');
+      setQuoteText(data.quote || '');
+      setCaptionText(data.caption || '');
+      setHashtags(data.hashtags || []);
+      if (data.bg_queries?.[0]) await handleSearchVisuals(data.bg_queries[0]);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : 'AI generation failed');
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleSchedulePost = async () => {
+    if (!selectedImage) {
+      setWorkspaceError('Search for and select an image before adding this post to your queue.');
+      return;
+    }
     setIsQueuing(true);
+    setWorkspaceError(null);
     try {
       const fullCaption = `${quoteText}\n\n${captionText}\n\n${hashtags.join(' ')}`;
       const res = await fetch('/api/posts', {
@@ -250,10 +127,14 @@ export default function WorkspacePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source: mode === 'auto' ? 'agent' : 'manual',
-          media_type: aspectRatio === '9/16' ? 'REELS' : 'IMAGE',
+          media_type: 'IMAGE',
           status: 'pending_approval',
           caption: fullCaption,
           media_paths: [selectedImage],
+          scheduled_at:
+            scheduledDate && scheduledTime
+              ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
+              : null,
           meta: {
             niche: selectedNiche,
             quote: quoteText,
@@ -264,20 +145,90 @@ export default function WorkspacePage() {
         }),
       });
 
-      if (res.ok) {
-        setQueueSuccess(true);
-        confetti({
-          particleCount: 80,
-          spread: 60,
-          origin: { y: 0.65 },
-          colors: ['#ec4899', '#8b5cf6', '#22c55e'],
-        });
-        setTimeout(() => setQueueSuccess(false), 4000);
-      }
-    } catch (err) {
-      console.error('Failed to queue post:', err);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Post could not be added to the queue');
+      setQueueSuccess(true);
+      confetti({
+        particleCount: 60,
+        spread: 55,
+        origin: { y: 0.65 },
+        colors: ['#ec4899', '#8b5cf6', '#22c55e'],
+      });
+      setTimeout(() => setQueueSuccess(false), 4000);
+    } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : 'Post could not be added to the queue',
+      );
     } finally {
       setIsQueuing(false);
+    }
+  };
+
+  const handleGenerateHybridCaption = async () => {
+    if (!hybridTheme.trim()) {
+      setWorkspaceError('Enter a theme for the caption first.');
+      return;
+    }
+    setWorkspaceError(null);
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ niche: hybridTheme }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Caption generation failed');
+      setHybridCaption([data.caption, ...(data.hashtags || [])].filter(Boolean).join('\n\n'));
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : 'Caption generation failed');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleUploadAndQueue = async () => {
+    if (!uploadFile) {
+      setWorkspaceError('Choose an image before adding it to the queue.');
+      return;
+    }
+    setWorkspaceError(null);
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.set('file', uploadFile);
+      const uploadResponse = await fetch('/api/library/upload', { method: 'POST', body: formData });
+      const uploadData = await uploadResponse.json();
+      if (!uploadResponse.ok) throw new Error(uploadData.error || 'Image upload failed');
+
+      const scheduledAt =
+        scheduledDate && scheduledTime
+          ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
+          : null;
+      const postResponse = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'manual',
+          media_type: 'IMAGE',
+          caption: hybridCaption,
+          media_paths: [uploadData.asset.url],
+          scheduled_at: scheduledAt,
+          meta: { title: uploadFile.name, theme: hybridTheme },
+        }),
+      });
+      const postData = await postResponse.json();
+      if (!postResponse.ok)
+        throw new Error(postData.error || 'Post could not be added to the queue');
+      setQueueSuccess(true);
+      setUploadFile(null);
+      setTimeout(() => setQueueSuccess(false), 4000);
+    } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : 'Post could not be added to the queue',
+      );
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -285,7 +236,7 @@ export default function WorkspacePage() {
     <div className="min-h-screen bg-surface-0 pb-20">
       <Header
         title="Creator Workspace"
-        description="Design quote cards, discover Pinterest aesthetics, and publish on autopilot"
+        description="Generate original post copy, search live visuals, and save posts to your queue"
       />
 
       <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
@@ -301,7 +252,7 @@ export default function WorkspacePage() {
               }`}
             >
               <Wand2 className="h-4 w-4 text-accent-400" />
-              Automated Agent (Pinterest + AI)
+              Automated Studio (Live visuals + AI copy)
             </button>
             <button
               onClick={() => setMode('hybrid')}
@@ -318,11 +269,28 @@ export default function WorkspacePage() {
 
           <div className="hidden md:flex items-center gap-3 text-xs text-surface-600">
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Instagram API v26.0 (Dry-Run Guard ON)
+              <span className="h-2 w-2 rounded-full bg-accent-500" />
+              Saved posts are scoped to your connected Instagram account
             </span>
           </div>
         </div>
+
+        {workspaceError && (
+          <div
+            role="alert"
+            className="flex items-center justify-between gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
+          >
+            <span>{workspaceError}</span>
+            <button
+              type="button"
+              onClick={() => setWorkspaceError(null)}
+              aria-label="Dismiss message"
+              className="text-xs font-semibold"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {mode === 'auto' ? (
           /* ============================================================ */
@@ -343,49 +311,40 @@ export default function WorkspacePage() {
                   <span className="text-xs text-surface-600">Target audience aesthetic</span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  {NICHES.map((niche) => {
-                    const isSelected = selectedNiche === niche.id;
-                    return (
-                      <button
-                        key={niche.id}
-                        onClick={() => handleNicheChange(niche.id)}
-                        className={`text-left p-3.5 rounded-xl border transition-all ${
-                          isSelected
-                            ? 'border-accent-500 bg-accent-500/5 ring-1 ring-accent-500'
-                            : 'border-surface-300 bg-surface-100/60 hover:border-surface-400'
-                        }`}
-                      >
-                        <div className="text-lg mb-1">{niche.icon}</div>
-                        <p className="text-xs font-semibold text-surface-950 line-clamp-1">
-                          {niche.name}
-                        </p>
-                        <p className="text-[10px] text-surface-600 line-clamp-1 mt-0.5">
-                          {niche.hint}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
+                <Input
+                  value={selectedNiche}
+                  onChange={(event) => setSelectedNiche(event.target.value)}
+                  placeholder="Describe any niche or audience, e.g. sustainable fashion"
+                  className="text-sm"
+                />
               </div>
 
-              {/* Step 2: Pinterest Visual Discovery Stream */}
+              {/* Step 2: live visual search */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <h3 className="text-sm font-semibold text-surface-950 flex items-center gap-2">
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-500/10 text-accent-400 text-xs font-bold">
                       2
                     </span>
-                    Pinterest Aesthetic Discovery
+                    Search live visuals
                   </h3>
-                  <Badge variant="accent" className="text-[10px] uppercase font-semibold">
-                    Live Scraper
-                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSearchVisuals()}
+                    disabled={isSearchingImages || !selectedNiche.trim()}
+                  >
+                    <RefreshCw
+                      className={`h-3.5 w-3.5 ${isSearchingImages ? 'animate-spin' : ''}`}
+                    />
+                    {isSearchingImages ? 'Searching…' : 'Search Pexels'}
+                  </Button>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {images.map((img) => {
-                    const isPicked = selectedImage === img.url;
+                {images.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {images.map((img) => {
+                      const isPicked = selectedImage === img.url;
                       return (
                         <div
                           key={img.id}
@@ -418,9 +377,15 @@ export default function WorkspacePage() {
                           </div>
                         </div>
                       );
-                    },
-                  )}
-                </div>
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-surface-400 px-4 py-8 text-center text-xs text-surface-600">
+                    {isSearchingImages
+                      ? 'Fetching live portrait images…'
+                      : 'Search for a style or generate a post to find matching images.'}
+                  </div>
+                )}
               </div>
 
               {/* Step 3: Canva-Style Card Customizer */}
@@ -432,28 +397,9 @@ export default function WorkspacePage() {
                     </span>
                     Studio Canvas Controls
                   </h3>
-                  <div className="flex items-center gap-2 text-xs">
-                    <button
-                      onClick={() => setAspectRatio('4/5')}
-                      className={`px-2.5 py-1 rounded-md transition-colors ${
-                        aspectRatio === '4/5'
-                          ? 'bg-surface-300 font-semibold text-surface-950'
-                          : 'text-surface-700'
-                      }`}
-                    >
-                      4:5 (Post)
-                    </button>
-                    <button
-                      onClick={() => setAspectRatio('9/16')}
-                      className={`px-2.5 py-1 rounded-md transition-colors ${
-                        aspectRatio === '9/16'
-                          ? 'bg-surface-300 font-semibold text-surface-950'
-                          : 'text-surface-700'
-                      }`}
-                    >
-                      9:16 (Reel)
-                    </button>
-                  </div>
+                  <Badge variant="outline" className="text-[10px]">
+                    Portrait image post
+                  </Badge>
                 </div>
 
                 {/* Quote Text Input */}
@@ -519,10 +465,10 @@ export default function WorkspacePage() {
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-500/10 text-accent-400 text-xs font-bold">
                       4
                     </span>
-                    Caption, Hashtags & Music
+                    Caption and Hashtags
                   </h3>
                   <Badge variant="default" className="text-[10px]">
-                    Gemini 2.0
+                    AI copy
                   </Badge>
                 </div>
 
@@ -552,38 +498,6 @@ export default function WorkspacePage() {
                     ))}
                   </div>
                 </div>
-
-                {/* Music & Audio */}
-                <div className="pt-2 border-t border-surface-300/60 flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-2">
-                    <Music className="h-4 w-4 text-accent-400" />
-                    <span className="text-xs font-medium text-surface-950">
-                      Audio Configuration:
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <button
-                      onClick={() => setAudioOption('trending_ig')}
-                      className={`px-3 py-1.5 rounded-lg border transition-all ${
-                        audioOption === 'trending_ig'
-                          ? 'border-accent-500 bg-accent-500/10 text-accent-400'
-                          : 'border-surface-400 text-surface-700'
-                      }`}
-                    >
-                      Trending Reel Sound (Meta Audio API)
-                    </button>
-                    <button
-                      onClick={() => setAudioOption('none')}
-                      className={`px-3 py-1.5 rounded-lg border transition-all ${
-                        audioOption === 'none'
-                          ? 'border-accent-500 bg-accent-500/10 text-accent-400'
-                          : 'border-surface-400 text-surface-700'
-                      }`}
-                    >
-                      Image Post (No Audio)
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -607,20 +521,27 @@ export default function WorkspacePage() {
                       Publishing Schedule
                     </span>
                     <Badge variant="default" className="text-[10px]">
-                      Asia/Kolkata
+                      {localTimeZone || 'Local time'}
                     </Badge>
                   </CardTitle>
-                  <CardDescription>Scheduled slot for highest engagement</CardDescription>
+                  <CardDescription>
+                    The selected date and time use your device timezone
+                  </CardDescription>
                 </CardHeader>
 
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs text-surface-700">Date</label>
-                      <Input type="date" defaultValue="2026-11-02" className="text-xs" />
+                      <Input
+                        type="date"
+                        value={scheduledDate}
+                        onChange={(event) => setScheduledDate(event.target.value)}
+                        className="text-xs"
+                      />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs text-surface-700">Time (IST)</label>
+                      <label className="text-xs text-surface-700">Time</label>
                       <Input
                         type="time"
                         value={scheduledTime}
@@ -636,10 +557,13 @@ export default function WorkspacePage() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3 text-xs text-emerald-400 flex items-center gap-2"
+                        className="rounded-xl bg-success/10 border border-success/30 p-3 text-xs text-success flex items-center gap-2"
                       >
                         <Check className="h-4 w-4 shrink-0 stroke-[3]" />
-                        <span>Successfully added to publishing queue for {scheduledTime} IST!</span>
+                        <span>
+                          Post saved for {scheduledDate} at {scheduledTime} (
+                          {localTimeZone || 'local time'}).
+                        </span>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -648,13 +572,13 @@ export default function WorkspacePage() {
                     variant="accent"
                     size="lg"
                     onClick={handleSchedulePost}
-                    disabled={isQueuing}
+                    disabled={isQueuing || !selectedImage}
                     className="w-full shadow-lg shadow-accent-500/25 cursor-pointer font-semibold"
                   >
                     {isQueuing ? (
                       <span className="flex items-center gap-2">
                         <RefreshCw className="h-4 w-4 animate-spin" />
-                        Generating Container & Scheduling...
+                        Saving to your publishing queue...
                       </span>
                     ) : (
                       <span className="flex items-center gap-2">
@@ -677,40 +601,71 @@ export default function WorkspacePage() {
             animate="visible"
             className="max-w-2xl mx-auto space-y-6 pt-4"
           >
-            <div className="rounded-2xl border-2 border-dashed border-surface-400 bg-surface-100/50 p-12 text-center flex flex-col items-center justify-center space-y-4 hover:border-accent-500/60 transition-colors cursor-pointer">
+            <div className="rounded-2xl border-2 border-dashed border-surface-400 bg-surface-100/50 p-8 text-center flex flex-col items-center justify-center space-y-4 hover:border-accent-500/60 transition-colors">
               <div className="h-14 w-14 rounded-2xl bg-accent-500/10 flex items-center justify-center text-accent-400">
                 <Upload className="h-7 w-7" />
               </div>
               <div className="space-y-1">
                 <p className="text-base font-semibold text-surface-950 font-display">
-                  Drop your Reel (MP4) or High-Res Image here
+                  Add an image to your library
                 </p>
                 <p className="text-xs text-surface-600 max-w-sm">
-                  Supports MP4, MOV (up to 300MB) and JPEG (up to 8MB). Recommended 9:16 vertical or
-                  4:5 portrait.
+                  Choose a JPEG, PNG, or WebP image up to 8 MB. It will be saved to your account’s
+                  media library.
                 </p>
               </div>
-              <Button variant="outline" size="sm">
-                Browse Files
-              </Button>
+              <Input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
+                className="max-w-sm text-xs"
+              />
+              {uploadFile && (
+                <p className="text-xs text-surface-700">Selected: {uploadFile.name}</p>
+              )}
             </div>
 
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Quick AI Captioner</CardTitle>
-                <CardDescription>
-                  AI will inspect your uploaded file and generate viral hooks
-                </CardDescription>
+                <CardDescription>Generate caption copy from the theme you provide</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Input
-                  placeholder="Optional: Tell AI the theme or tone (e.g. 'late night gym motivation')"
+                  placeholder="Describe the theme or tone for this caption"
+                  value={hybridTheme}
+                  onChange={(event) => setHybridTheme(event.target.value)}
                   className="text-xs"
                 />
-                <Button variant="accent" className="w-full text-xs">
+                <Button
+                  variant="accent"
+                  onClick={handleGenerateHybridCaption}
+                  disabled={isGenerating}
+                  className="w-full text-xs"
+                >
                   <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                  Generate Caption & Schedule
+                  {isGenerating ? 'Generating…' : 'Generate caption'}
                 </Button>
+                <textarea
+                  rows={4}
+                  value={hybridCaption}
+                  onChange={(event) => setHybridCaption(event.target.value)}
+                  placeholder="Generated caption and hashtags will appear here"
+                  className="w-full rounded-xl border border-surface-400 bg-surface-200/50 p-3 text-xs text-surface-950"
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleUploadAndQueue}
+                  disabled={isUploading || !uploadFile}
+                  className="w-full text-xs"
+                >
+                  {isUploading ? 'Uploading and saving…' : 'Upload and add to queue'}
+                </Button>
+                {queueSuccess && (
+                  <p className="text-center text-xs font-medium text-success">
+                    Image saved and post added to your queue.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </motion.div>

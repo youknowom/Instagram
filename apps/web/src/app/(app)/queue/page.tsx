@@ -7,12 +7,10 @@ import {
   ListTodo,
   Clock,
   CheckCircle2,
-  AlertCircle,
-  Play,
   Trash2,
   Sparkles,
   RefreshCw,
-  ExternalLink,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { InstagramIcon } from '@/components/ui/icons';
 import { Header } from '@/components/layout/header';
@@ -23,78 +21,65 @@ import { fadeUp, springGentle } from '@/lib/motion';
 
 interface PostItem {
   id: string;
-  source: 'manual' | 'agent';
-  mediaType: 'REELS' | 'IMAGE';
-  niche: string;
+  source: string;
+  mediaType: string;
+  niche: string | null;
   quote: string;
   caption: string;
-  scheduledAt: string;
-  status: 'pending_approval' | 'approved' | 'publishing' | 'posted' | 'failed';
-  imageUrl: string;
-  likes?: string;
-  views?: string;
-  igPermalink?: string;
+  scheduledAt: string | null;
+  status: string;
+  imageUrl: string | null;
+  igPermalink: string | null;
+  error: string | null;
 }
 
-const INITIAL_QUEUE: PostItem[] = [
-  {
-    id: 'q1',
-    source: 'agent',
-    mediaType: 'IMAGE',
-    niche: 'Couple & Romance',
-    quote: 'In a room full of art, I would still stare at you.',
-    caption:
-      'Some connections don’t need words — they just exist in quiet glances and comfortable silences. ✨ #couplelove',
-    scheduledAt: 'Today, 7:30 PM IST',
-    status: 'pending_approval',
-    imageUrl:
-      'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'q2',
-    source: 'agent',
-    mediaType: 'IMAGE',
-    niche: 'Stoic Wisdom',
-    quote: 'You have power over your mind, not outside events.',
-    caption: 'Mastering the art of indifference toward what you cannot control. #stoic',
-    scheduledAt: 'Tomorrow, 10:00 AM IST',
-    status: 'approved',
-    imageUrl:
-      'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80',
-  },
-];
+interface ApiPost {
+  id: string;
+  source: string;
+  media_type: string;
+  meta: Record<string, string> | null;
+  caption: string;
+  scheduled_at: string | null;
+  status: string;
+  media_paths: string[];
+  ig_permalink: string | null;
+  error: string | null;
+}
+
+const FILTERS = ['all', 'pending_approval', 'approved', 'publishing', 'posted', 'failed'];
 
 export default function QueuePage() {
-  const [filter, setFilter] = React.useState<string>('all');
-  const [posts, setPosts] = React.useState<PostItem[]>(INITIAL_QUEUE);
+  const [filter, setFilter] = React.useState('all');
+  const [posts, setPosts] = React.useState<PostItem[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [publishingId, setPublishingId] = React.useState<string | null>(null);
 
   const fetchPosts = React.useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/posts');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.posts && data.posts.length > 0) {
-          const mapped: PostItem[] = data.posts.map((p: any) => ({
-            id: p.id,
-            source: p.source || 'agent',
-            mediaType: p.media_type || 'IMAGE',
-            niche: p.meta?.niche || 'Automated',
-            quote: p.meta?.quote || p.caption?.slice(0, 60) || 'Post Item',
-            caption: p.caption || '',
-            scheduledAt: p.scheduled_at
-              ? new Date(p.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              : 'Scheduled',
-            status: p.status,
-            imageUrl: p.media_paths?.[0] || 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600&auto=format&fit=crop&q=80',
-            igPermalink: p.ig_permalink,
-          }));
-          setPosts(mapped);
-        }
-      }
-    } catch {
-      // Keep initial queue
+      const response = await fetch('/api/posts', { cache: 'no-store' });
+      const data: { error?: string; posts?: ApiPost[] } = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Queue could not be loaded');
+      setPosts(
+        (data.posts || []).map((post) => ({
+          id: post.id,
+          source: post.source,
+          mediaType: post.media_type,
+          niche: post.meta?.niche || null,
+          quote: post.meta?.quote || '',
+          caption: post.caption || '',
+          scheduledAt: post.scheduled_at,
+          status: post.status,
+          imageUrl: post.media_paths?.[0] || null,
+          igPermalink: post.ig_permalink || null,
+          error: post.error || null,
+        })),
+      );
+      setError(null);
+    } catch (cause) {
+      setPosts([]);
+      setError(cause instanceof Error ? cause.message : 'Queue could not be loaded');
     } finally {
       setLoading(false);
     }
@@ -104,80 +89,47 @@ export default function QueuePage() {
     fetchPosts();
   }, [fetchPosts]);
 
-  const filteredPosts = posts.filter((p) => {
-    if (filter === 'all') return true;
-    return p.status === filter;
-  });
+  const filteredPosts = posts.filter((post) => filter === 'all' || post.status === filter);
 
   const handleApprove = async (id: string) => {
-    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'approved' } : p)));
-    if (!id.startsWith('q')) {
-      try {
-        await fetch(`/api/posts/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'approved' }),
-        });
-      } catch {
-        // silent
-      }
+    try {
+      const response = await fetch(`/api/posts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Post could not be approved');
+      await fetchPosts();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Post could not be approved');
     }
   };
 
   const handlePublishNow = async (id: string) => {
     setPublishingId(id);
-    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'publishing' } : p)));
-
-    if (id.startsWith('q')) {
-      // Mock post preview
-      setTimeout(() => {
-        setPosts((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, status: 'posted', likes: '1.2k', views: '14.5k' } : p))
-        );
-        setPublishingId(null);
-      }, 1000);
-      return;
-    }
-
     try {
-      const res = await fetch(`/api/posts/${id}/publish`, {
-        method: 'POST',
-      });
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        setPosts((prev) =>
-          prev.map((p) =>
-            p.id === id
-              ? {
-                  ...p,
-                  status: 'posted',
-                  likes: '0',
-                  views: '0',
-                }
-              : p
-          )
-        );
-      } else {
-        alert(data.error || 'Publishing failed. Check Instagram connection.');
-        setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'approved' } : p)));
-      }
-    } catch (err) {
-      alert('Network error while publishing');
-      setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'approved' } : p)));
+      const response = await fetch(`/api/posts/${id}/publish`, { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Publishing failed');
+      await fetchPosts();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Publishing failed';
+      await fetchPosts();
+      setError(message);
     } finally {
       setPublishingId(null);
     }
   };
 
   const handleDelete = async (id: string) => {
-    setPosts((prev) => prev.filter((p) => p.id !== id));
-    if (!id.startsWith('q')) {
-      try {
-        await fetch(`/api/posts/${id}`, { method: 'DELETE' });
-      } catch {
-        // silent
-      }
+    try {
+      const response = await fetch(`/api/posts/${id}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Post could not be deleted');
+      await fetchPosts();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Post could not be deleted');
     }
   };
 
@@ -185,43 +137,47 @@ export default function QueuePage() {
     <div className="min-h-screen bg-surface-0 pb-20">
       <Header
         title="Publishing Queue"
-        description="Monitor, approve, reschedule and publish posts live to Instagram"
+        description="Review saved posts and publish them to your connected Instagram account"
       />
-
-      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
-        {/* Controls Bar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-surface-300 pb-5">
-          <div className="flex flex-wrap items-center gap-1.5 bg-surface-100 p-1 rounded-xl border border-surface-300 text-xs">
-            {['all', 'pending_approval', 'approved', 'posted'].map((tab) => (
+      <div className="mx-auto max-w-7xl space-y-6 p-6 md:p-8">
+        <div className="flex flex-col items-start justify-between gap-4 border-b border-surface-300 pb-5 sm:flex-row sm:items-center">
+          <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-surface-300 bg-surface-100 p-1 text-xs">
+            {FILTERS.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setFilter(tab)}
-                className={`px-3 py-1.5 rounded-lg font-medium capitalize transition-all ${
-                  filter === tab
-                    ? 'bg-surface-950 text-surface-0 shadow-sm'
-                    : 'text-surface-700 hover:text-surface-950'
-                }`}
+                className={`rounded-lg px-3 py-1.5 font-medium capitalize transition-colors ${filter === tab ? 'bg-surface-950 text-surface-0 shadow-sm' : 'text-surface-700 hover:text-surface-950'}`}
               >
-                {tab.replace('_', ' ')}
+                {tab.replaceAll('_', ' ')}
               </button>
             ))}
           </div>
-
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={fetchPosts} disabled={loading}>
-              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
             </Button>
             <Link href="/workspace">
               <Button variant="accent" size="sm">
-                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                New Automated Post
+                <Sparkles className="h-3.5 w-3.5" /> New post
               </Button>
             </Link>
           </div>
         </div>
 
-        {/* Posts List */}
+        {error && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
+          >
+            <span>{error}</span>
+            {error.toLowerCase().includes('connect') && (
+              <Link href="/settings" className="font-semibold underline">
+                Connect Instagram
+              </Link>
+            )}
+          </div>
+        )}
+
         <div className="space-y-4">
           <AnimatePresence>
             {filteredPosts.map((post) => (
@@ -233,63 +189,70 @@ export default function QueuePage() {
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={springGentle}
               >
-                <Card className="overflow-hidden hover:border-surface-400/80 transition-all">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 p-5">
-                    {/* Thumbnail */}
-                    <div className="relative h-28 w-24 shrink-0 rounded-lg overflow-hidden bg-surface-200 border border-surface-300">
-                      <img
-                        src={post.imageUrl}
-                        alt={post.quote}
-                        className="h-full w-full object-cover"
-                      />
-                      <span className="absolute bottom-1 right-1 px-1 py-0.5 rounded text-[9px] font-bold bg-black/70 text-white uppercase">
+                <Card className="overflow-hidden transition-colors hover:border-surface-400">
+                  <div className="flex flex-col items-start gap-5 p-5 sm:flex-row sm:items-center">
+                    <div className="relative flex h-28 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-surface-300 bg-surface-200">
+                      {post.imageUrl ? (
+                        <img
+                          src={post.imageUrl}
+                          alt={post.quote || 'Post media'}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <ImageIcon className="h-7 w-7 text-surface-600" />
+                      )}
+                      <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 text-[9px] font-bold uppercase text-white">
                         {post.mediaType}
                       </span>
                     </div>
-
-                    {/* Content Details */}
-                    <div className="flex-1 space-y-2 min-w-0">
+                    <div className="min-w-0 flex-1 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="accent" className="text-[10px] uppercase font-semibold">
-                          {post.niche}
-                        </Badge>
+                        {post.niche && (
+                          <Badge variant="accent" className="text-[10px]">
+                            {post.niche}
+                          </Badge>
+                        )}
                         <Badge
                           variant={
                             post.status === 'posted'
                               ? 'success'
-                              : post.status === 'approved'
-                                ? 'default'
+                              : post.status === 'failed'
+                                ? 'error'
                                 : post.status === 'pending_approval'
                                   ? 'warning'
-                                  : 'error'
+                                  : 'outline'
                           }
-                          className="text-[10px] capitalize"
+                          className="capitalize"
                         >
-                          {post.status.replace('_', ' ')}
+                          {post.status.replaceAll('_', ' ')}
                         </Badge>
-                        <span className="text-xs text-surface-600 flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {post.scheduledAt}
-                        </span>
+                        {post.scheduledAt && (
+                          <span className="flex items-center gap-1 text-xs text-surface-600">
+                            <Clock className="h-3 w-3" />
+                            {new Date(post.scheduledAt).toLocaleString()}
+                          </span>
+                        )}
                       </div>
-
-                      <p className="text-sm font-semibold text-surface-950 font-display line-clamp-1">
-                        "{post.quote}"
+                      <p className="line-clamp-1 font-display text-sm font-semibold text-surface-950">
+                        {post.quote || post.caption || 'Untitled post'}
                       </p>
-                      <p className="text-xs text-surface-700 line-clamp-2">{post.caption}</p>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-surface-300">
-                      {post.status === 'pending_approval' && (
-                        <Button
-                          variant="accent"
-                          size="sm"
-                          onClick={() => handleApprove(post.id)}
-                          className="text-xs"
+                      <p className="line-clamp-2 text-xs text-surface-700">{post.caption}</p>
+                      {post.error && <p className="text-xs text-error">{post.error}</p>}
+                      {post.igPermalink && (
+                        <a
+                          href={post.igPermalink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-accent-600 underline"
                         >
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                          Approve Post
+                          View on Instagram
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex w-full shrink-0 items-center gap-2 border-t border-surface-300 pt-3 sm:w-auto sm:flex-col sm:items-end sm:border-0 sm:pt-0">
+                      {post.status === 'pending_approval' && (
+                        <Button variant="accent" size="sm" onClick={() => handleApprove(post.id)}>
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Approve
                         </Button>
                       )}
                       {post.status === 'approved' && (
@@ -298,32 +261,26 @@ export default function QueuePage() {
                           size="sm"
                           disabled={publishingId === post.id}
                           onClick={() => handlePublishNow(post.id)}
-                          className="text-xs text-surface-900 border-accent-500/40 hover:bg-accent-500/10"
                         >
                           {publishingId === post.id ? (
-                            <>
-                              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                              Publishing...
-                            </>
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                           ) : (
-                            <>
-                              <InstagramIcon className="h-3 w-3 mr-1 text-accent-500" />
-                              Publish Now (Live)
-                            </>
+                            <InstagramIcon className="h-3.5 w-3.5 text-accent-500" />
                           )}
+                          {publishingId === post.id ? 'Publishing…' : 'Publish now'}
                         </Button>
                       )}
                       {post.status === 'posted' && (
-                        <Badge variant="success" className="text-xs flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Published to Instagram
+                        <Badge variant="success" className="flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" /> Published
                         </Badge>
                       )}
                       <Button
                         variant="ghost"
                         size="sm"
+                        aria-label="Delete post"
                         onClick={() => handleDelete(post.id)}
-                        className="text-xs text-surface-600 hover:text-error"
+                        className="text-surface-600 hover:text-error"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -334,16 +291,24 @@ export default function QueuePage() {
             ))}
           </AnimatePresence>
 
-          {filteredPosts.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
+          {!loading && filteredPosts.length === 0 && (
+            <div className="flex flex-col items-center justify-center space-y-3 py-20 text-center">
               <ListTodo className="h-10 w-10 text-surface-600" />
-              <p className="text-sm font-medium text-surface-900">No posts in this category</p>
+              <p className="text-sm font-medium text-surface-900">
+                {posts.length ? 'No posts in this category' : 'Your queue is empty'}
+              </p>
+              <p className="text-xs text-surface-600">
+                Posts saved from the workspace will appear here.
+              </p>
               <Link href="/workspace">
                 <Button variant="accent" size="sm">
-                  Create a Post Now
+                  Create a post
                 </Button>
               </Link>
             </div>
+          )}
+          {loading && (
+            <p className="py-12 text-center text-sm text-surface-600">Loading saved posts…</p>
           )}
         </div>
       </div>

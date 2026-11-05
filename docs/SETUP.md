@@ -4,36 +4,38 @@ Complete these steps in order. This is **HUMAN GATE 0** — the system cannot pr
 
 ## 1. Meta Developer App
 
-1. Go to [Meta for Developers](https://developers.facebook.com/) and create a new app (type: **Consumer** or **None**).
-2. Add the **Instagram** product to the app.
-3. In **App Settings > Basic**, note your **App ID** and **App Secret**.
+1. Go to [Meta for Developers](https://developers.facebook.com/) and create or configure an app with the **Manage messaging & content on Instagram** use case.
+2. Under **Use cases > Customize > Instagram API > API setup with Unified Login**, create or select a Facebook Login for Business configuration. For continuous access, use a system-user token with **Never** expiration, require an Instagram account asset, and select the Instagram permissions the product uses.
+3. Register each app origin's callback in the Unified Login setup. For local development, use `http://localhost:3000/api/auth/instagram/callback`; for deployment, use `<your-app-origin>/api/auth/instagram/callback`. Select the matching registered URL when testing each origin.
+4. Copy the Meta App ID and App Secret from **App Settings > Basic** into `META_APP_ID` and `META_APP_SECRET`. Copy the selected login configuration's ID into `IG_CONFIG_ID`, and set `IG_AUTH_MODE=facebook_login`.
+5. During development, add the Instagram account as an **Instagram Tester** and accept the invitation. App Review and Advanced Access are required before other businesses can connect.
+
+Older apps that still expose direct Instagram Login can instead use `IG_AUTH_MODE=instagram_login` with `IG_CLIENT_ID` and `IG_CLIENT_SECRET` from that product's setup page.
 
 ## 2. Instagram Account Setup
 
 1. Ensure your Instagram account is a **Professional** account (Business or Creator).
    - Go to Instagram > Settings > Account > Switch to Professional Account.
-   - The spec says Creator _may_ work; try Creator first and report back at Gate 2.
 2. In the Meta Developer App:
    - Go to **Instagram > API setup with Instagram Login**
    - Add your Instagram account as an **Instagram Tester**.
    - Open the Instagram app on your phone and accept the tester invite:
      **Settings > Website permissions > tester invites**.
-3. Generate a **short-lived access token** from the API setup page.
-4. Required permissions:
+3. The app requests these permissions during Instagram Login:
    - `instagram_business_basic`
    - `instagram_business_content_publish`
    - `instagram_business_manage_insights`
 
-## 3. Page Publishing Authorization
+## 3. Publishing Setup
 
-If your Instagram account is linked to a Facebook Page, complete **Page Publishing Authorization** for that page. Without this, publishing will fail.
+The Unified Login configuration must include the Instagram professional account as a required asset. The product uses the granted system-user token for the selected Instagram account.
 
 ## 4. Supabase Project
 
 1. Create a free project at [supabase.com](https://supabase.com/).
 2. Note your **Project URL**, **Anon Key**, and **Service Role Key** (Settings > API).
-3. Run the initial migration:
-   - Option A: Copy `supabase/migrations/00001_initial_schema.sql` and run it in the SQL Editor.
+3. Run every migration in `supabase/migrations` in filename order, including `00003_account_scoped_content.sql`:
+   - Option A: Copy each migration into the SQL Editor in filename order.
    - Option B: Use the Supabase CLI: `npx supabase db push`
 4. Create storage buckets:
    - `media-public`: Public read, service role writes only.
@@ -73,8 +75,11 @@ If your Instagram account is linked to a Facebook Page, complete **Page Publishi
 4. Add all other secrets to **GitHub repo Settings > Secrets and variables > Actions**:
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
-   - `IG_APP_SECRET`
-   - `IG_USER_ID`
+   - `META_APP_ID`, `META_APP_SECRET`, `IG_CONFIG_ID`, and `IG_AUTH_MODE=facebook_login` (Unified Login)
+   - `IG_CLIENT_ID` and `IG_CLIENT_SECRET` (older direct Instagram Login apps only)
+   - `IG_AUTH_MODE`
+   - `IG_SESSION_SECRET` (optional; defaults to a server-side signing key)
+   - `IG_GRAPH_API_VERSION` (defaults to the Graph version pinned in the project)
    - `GEMINI_API_KEY`
    - `GEMINI_MODEL`
    - `PEXELS_API_KEY`

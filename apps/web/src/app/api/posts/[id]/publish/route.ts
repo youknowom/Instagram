@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import {
+  getInstagramAccountId,
+  getInstagramGraphUrl,
+  getInstagramTokenInfo,
+} from '@/lib/instagram';
 
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const accountId = getInstagramAccountId(request);
+    if (!accountId) {
+      return NextResponse.json({ error: 'Connect an Instagram account first' }, { status: 401 });
+    }
     const { id } = await params;
     const supabase = getSupabaseAdmin();
 
@@ -14,6 +20,7 @@ export async function POST(
       .from('posts')
       .select('*')
       .eq('id', id)
+      .eq('instagram_user_id', accountId)
       .single();
 
     if (postErr || !post) {
@@ -21,40 +28,60 @@ export async function POST(
     }
 
     // 2. Retrieve active Instagram token
-    const { data: kvData } = await supabase
-      .from('kv')
-      .select('value')
-      .eq('key', 'ig_access_token')
-      .maybeSingle();
+    const tokenInfo = await getInstagramTokenInfo(supabase, accountId);
+    const accessToken = tokenInfo?.token;
+    const igUserId = tokenInfo?.user_id;
 
-    const tokenInfo = kvData?.value as {
-      token?: string;
-      user_id?: string;
-      username?: string;
-    } | undefined;
-
-    const accessToken = tokenInfo?.token || process.env.IG_INITIAL_TOKEN;
-    const igUserId = tokenInfo?.user_id || process.env.IG_USER_ID;
-
-    if (!accessToken || !igUserId) {
+    if (!accessToken || igUserId !== accountId) {
       return NextResponse.json(
         { error: 'No Instagram account connected. Please connect in Settings first.' },
-        { status: 400 }
+        { status: 400 },
+      );
+    }
+
+    const { data: settingsData, error: settingsError } = await supabase
+      .from('kv')
+      .select('value')
+      .eq('key', `account_settings:${accountId}`)
+      .maybeSingle();
+    if (settingsError) throw new Error(settingsError.message);
+    const accountSettings = settingsData?.value as { livePublishEnabled?: boolean } | undefined;
+    if (accountSettings?.livePublishEnabled !== true) {
+      return NextResponse.json(
+        { error: 'Live publishing is disabled. Enable it in Settings before publishing.' },
+        { status: 403 },
       );
     }
 
     // Check media path
-    const imageUrl = post.media_paths?.[0];
-    if (!imageUrl) {
+    const mediaUrl = post.media_paths?.[0];
+    if (!mediaUrl) {
       return NextResponse.json({ error: 'Post has no media attached' }, { status: 400 });
     }
 
+    if (!['IMAGE', 'REELS'].includes(post.media_type)) {
+      return NextResponse.json(
+        { error: 'Publishing this media type is not configured.' },
+        { status: 400 },
+      );
+    }
+
     // Update status to publishing
-    await supabase.from('posts').update({ status: 'publishing' }).eq('id', id);
+    await supabase
+      .from('posts')
+      .update({ status: 'publishing' })
+      .eq('id', id)
+      .eq('instagram_user_id', accountId);
 
     // 3. Create Instagram Container
-    const containerUrl = new URL(`https://graph.facebook.com/v26.0/${igUserId}/media`);
-    containerUrl.searchParams.set('image_url', imageUrl);
+    const containerUrl = new URL(getInstagramGraphUrl(`${igUserId}/media`));
+    if (post.media_type === 'REELS') {
+      containerUrl.searchParams.set('media_type', 'REELS');
+      containerUrl.searchParams.set('video_url', mediaUrl);
+      containerUrl.searchParams.set('share_to_feed', 'true');
+    } else {
+      containerUrl.searchParams.set('image_url', mediaUrl);
+    }
     containerUrl.searchParams.set('caption', post.caption || '');
     containerUrl.searchParams.set('access_token', accessToken);
 
@@ -66,17 +93,55 @@ export async function POST(
       await supabase
         .from('posts')
         .update({ status: 'failed', error: errMsg })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('instagram_user_id', accountId);
       return NextResponse.json({ error: errMsg }, { status: 400 });
     }
 
     const containerId = containerData.id;
 
-    // Small delay to ensure container processing is ready
-    await new Promise((res) => setTimeout(res, 2000));
+    if (post.media_type === 'REELS') {
+      let ready = false;
+      let processingError: string | null = null;
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const statusUrl = new URL(getInstagramGraphUrl(containerId));
+        statusUrl.searchParams.set('fields', 'status_code');
+        statusUrl.searchParams.set('access_token', accessToken);
+        const statusResponse = await fetch(statusUrl, { cache: 'no-store' });
+        const statusData = await statusResponse.json();
+        if (
+          !statusResponse.ok ||
+          statusData.status_code === 'ERROR' ||
+          statusData.status_code === 'EXPIRED'
+        ) {
+          processingError =
+            statusData?.error?.message ||
+            `Instagram video processing stopped: ${statusData.status_code || statusResponse.status}`;
+          break;
+        }
+        if (statusData.status_code === 'FINISHED') {
+          ready = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+      if (!ready) {
+        const message =
+          processingError ||
+          'Instagram is still processing this video. Refresh the queue and try again.';
+        await supabase
+          .from('posts')
+          .update({ status: 'failed', error: message })
+          .eq('id', id)
+          .eq('instagram_user_id', accountId);
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
 
     // 4. Publish Container
-    const publishUrl = new URL(`https://graph.facebook.com/v26.0/${igUserId}/media_publish`);
+    const publishUrl = new URL(getInstagramGraphUrl(`${igUserId}/media_publish`));
     publishUrl.searchParams.set('creation_id', containerId);
     publishUrl.searchParams.set('access_token', accessToken);
 
@@ -88,7 +153,8 @@ export async function POST(
       await supabase
         .from('posts')
         .update({ status: 'failed', error: errMsg })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('instagram_user_id', accountId);
       return NextResponse.json({ error: errMsg }, { status: 400 });
     }
 
@@ -104,6 +170,7 @@ export async function POST(
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
+      .eq('instagram_user_id', accountId)
       .select()
       .single();
 
@@ -117,4 +184,3 @@ export async function POST(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
