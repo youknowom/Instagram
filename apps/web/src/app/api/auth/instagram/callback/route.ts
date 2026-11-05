@@ -25,11 +25,110 @@ interface StoredAccount {
   expiresInSeconds: number;
 }
 
+interface MetaPermission {
+  permission?: string;
+  status?: string;
+}
+
+interface MetaGranularScope {
+  scope?: string;
+  target_ids?: string[];
+}
+
 function instagramError(
   data: { error?: { message?: string }; error_message?: string },
   fallback: string,
 ) {
   return data?.error?.message || data?.error_message || fallback;
+}
+
+async function getMetaGrantDiagnostics(token: string, appId: string, appSecret: string) {
+  const appAccessToken = `${appId}|${appSecret}`;
+  const debugUrl = new URL(`https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}/debug_token`);
+  debugUrl.searchParams.set('input_token', token);
+
+  const [identityResult, permissionsResult, debugResult] = await Promise.allSettled([
+    fetch(
+      `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}/me?fields=client_business_id&access_token=${encodeURIComponent(token)}`,
+      { cache: 'no-store' },
+    ),
+    fetch(
+      `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}/me/permissions?access_token=${encodeURIComponent(token)}`,
+      { cache: 'no-store' },
+    ),
+    fetch(debugUrl, {
+      headers: { Authorization: `Bearer ${appAccessToken}` },
+      cache: 'no-store',
+    }),
+  ]);
+
+  let hasBusinessPortfolio = false;
+  if (identityResult.status === 'fulfilled' && identityResult.value.ok) {
+    const identity = (await identityResult.value.json()) as { client_business_id?: string };
+    hasBusinessPortfolio = Boolean(identity.client_business_id);
+  }
+
+  const permissions = new Map<string, string>();
+  if (permissionsResult.status === 'fulfilled' && permissionsResult.value.ok) {
+    const permissionData = (await permissionsResult.value.json()) as { data?: MetaPermission[] };
+    for (const permission of permissionData.data || []) {
+      if (permission.permission && permission.status) {
+        permissions.set(permission.permission, permission.status);
+      }
+    }
+  }
+
+  let isTokenValid: boolean | null = null;
+  let tokenType = 'unknown';
+  let grantedScopes = new Set<string>();
+  let instagramTargetIds: string[] = [];
+  if (debugResult.status === 'fulfilled' && debugResult.value.ok) {
+    const debugData = (await debugResult.value.json()) as {
+      data?: {
+        is_valid?: boolean;
+        type?: string;
+        scopes?: string[];
+        granular_scopes?: MetaGranularScope[];
+      };
+    };
+    isTokenValid = debugData.data?.is_valid ?? null;
+    tokenType = debugData.data?.type || 'unknown';
+    grantedScopes = new Set(debugData.data?.scopes || []);
+    instagramTargetIds = [
+      ...new Set(
+        (debugData.data?.granular_scopes || [])
+          .filter((scope) => scope.scope?.startsWith('instagram_'))
+          .flatMap((scope) => scope.target_ids || []),
+      ),
+    ];
+  }
+
+  return {
+    hasBusinessPortfolio,
+    instagramBasic: permissions.get('instagram_basic') || 'unknown',
+    instagramInsights: permissions.get('instagram_manage_insights') || 'unknown',
+    instagramPublish: permissions.get('instagram_content_publish') || 'unknown',
+    isTokenValid,
+    tokenType,
+    hasInstagramBasicScope: grantedScopes.has('instagram_basic'),
+    instagramTargetIds,
+  };
+}
+
+async function getInstagramProfileById(accountId: string, token: string) {
+  const profileUrl = new URL(
+    `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}/${encodeURIComponent(accountId)}`,
+  );
+  profileUrl.searchParams.set(
+    'fields',
+    'id,username,name,profile_picture_url,account_type,followers_count,follows_count,media_count',
+  );
+  profileUrl.searchParams.set('access_token', token);
+  const profileResponse = await fetch(profileUrl, { cache: 'no-store' });
+  if (!profileResponse.ok) return null;
+
+  const profile = (await profileResponse.json()) as InstagramProfile;
+  return profile.id && profile.username ? profile : null;
 }
 
 async function getInstagramLoginAccount(
@@ -136,11 +235,36 @@ async function getFacebookLoginAccount(
     );
   }
 
-  const profile = (accountsData.data as InstagramProfile[] | undefined)?.[0];
+  let profile = (accountsData.data as InstagramProfile[] | undefined)?.[0];
   if (!profile?.id) {
-    throw new Error(
-      'No Instagram account was granted. Choose an Instagram professional account in the Meta login dialog and try again.',
-    );
+    const diagnostics = await getMetaGrantDiagnostics(token, appId, appSecret);
+    for (const targetId of diagnostics.instagramTargetIds) {
+      profile = (await getInstagramProfileById(targetId, token)) || undefined;
+      if (profile?.id) break;
+    }
+
+    if (profile?.id) {
+      console.info('[Instagram OAuth] Resolved selected account from token-granted scope targets', {
+        graphVersion: INSTAGRAM_GRAPH_VERSION,
+      });
+    } else {
+      console.warn('[Instagram OAuth] Meta returned no Instagram account for the granted token', {
+        graphVersion: INSTAGRAM_GRAPH_VERSION,
+        metaRequestId: accountsResponse.headers.get('x-fb-request-id'),
+        hasBusinessPortfolio: diagnostics.hasBusinessPortfolio,
+        instagramBasic: diagnostics.instagramBasic,
+        instagramInsights: diagnostics.instagramInsights,
+        instagramPublish: diagnostics.instagramPublish,
+        isTokenValid: diagnostics.isTokenValid,
+        tokenType: diagnostics.tokenType,
+        hasInstagramBasicScope: diagnostics.hasInstagramBasicScope,
+        instagramTargetCount: diagnostics.instagramTargetIds.length,
+      });
+
+      throw new Error(
+        `Meta login completed, but the API returned no Instagram account for the granted token${accountsResponse.headers.get('x-fb-request-id') ? ` (Meta request ${accountsResponse.headers.get('x-fb-request-id')})` : ''}. The connection was not saved. Confirm the account is Business or Creator and belongs to the selected business portfolio.`,
+      );
+    }
   }
 
   return {
